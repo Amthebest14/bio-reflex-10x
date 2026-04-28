@@ -4,7 +4,7 @@ import { createManagedRppgSession } from '@elata-biosciences/rppg-web';
 
 export const BiometricCamera: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { setBiometrics } = useGameStore();
+  const { setBiometrics, startGame } = useGameStore();
 
   useEffect(() => {
     let active = true;
@@ -13,14 +13,17 @@ export const BiometricCamera: React.FC = () => {
 
     const initCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+        // Explicit Permission Request
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user' } 
         });
         
         if (videoRef.current && active) {
+          // Bind and Play
           videoRef.current.srcObject = stream;
+          await videoRef.current.play();
           
-          // Initialize SDK
+          // Delayed SDK Start
           session = await createManagedRppgSession({
              video: videoRef.current,
              maxRetries: 3
@@ -33,7 +36,6 @@ export const BiometricCamera: React.FC = () => {
             const metrics = session.getMetrics();
             
             // Map metrics to stress and focus
-            // higher bpm delta -> higher stress. signal quality -> focus.
             const stress = (metrics.baseline_delta || 0) * 2 + (metrics.bpm ? metrics.bpm - 60 : 0);
             const focus = (metrics.signal_quality || 0) * 100;
             
@@ -41,7 +43,10 @@ export const BiometricCamera: React.FC = () => {
           }, 250);
         }
       } catch (err) {
+        // Error Handling
         console.error("Camera or SDK init failed:", err);
+        alert("Camera initialization failed or was denied. Falling back to Guest Mode.");
+        startGame('guest');
       }
     };
 
@@ -60,7 +65,7 @@ export const BiometricCamera: React.FC = () => {
         videoRef.current.srcObject = null;
       }
     };
-  }, [setBiometrics]);
+  }, [setBiometrics, startGame]);
 
   return (
     <video 

@@ -3,10 +3,12 @@ import { useGameStore } from './store/useGameStore';
 import { BiometricCamera } from './components/BiometricCamera';
 import { GameBox } from './components/GameBox';
 import { SummaryScreen } from './components/SummaryScreen';
+import { StartScreen } from './components/StartScreen';
+import { HUD } from './components/HUD';
 import './index.css';
 
 function App() {
-  const { gameState, finishCalibration } = useGameStore();
+  const { gameState, finishCalibration, gameMode } = useGameStore();
 
   useEffect(() => {
     if (gameState === 'CALIBRATING') {
@@ -19,18 +21,28 @@ function App() {
 
   return (
     <div className="app-container">
-      <BiometricCamera />
+      {/* HUD only shown during gameplay or summary */}
+      {gameState !== 'START_SCREEN' && gameState !== 'CALIBRATING' && (
+        <HUD />
+      )}
+
+      {/* Only render camera if gameMode is bio */}
+      {gameMode === 'bio' && <BiometricCamera />}
 
       <main className="main-content">
+        {gameState === 'START_SCREEN' && (
+          <StartScreen />
+        )}
+
         {gameState === 'CALIBRATING' && (
           <div className="calibration-screen">
-            <h1 className="title">Bio-Reflex</h1>
-            <p className="subtitle">Calibrating biometrics... Please hold still.</p>
+            <h2 className="title">Connecting Bio-Tracker...</h2>
+            <p className="subtitle">Please hold still and face the camera.</p>
             <div className="spinner"></div>
           </div>
         )}
 
-        {(gameState === 'ROUND_START' || gameState === 'WAITING_RED' || gameState === 'GO_GREEN' || gameState === 'ROUND_RESULT') && (
+        {(gameState === 'ROUND_START' || gameState === 'WAITING_RED' || gameState === 'GO_GREEN' || gameState === 'PAUSE_PHASE') && (
           <GameBox />
         )}
 

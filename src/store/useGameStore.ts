@@ -1,47 +1,71 @@
 import { create } from 'zustand';
 
-export type GameState = 'CALIBRATING' | 'ROUND_START' | 'WAITING_RED' | 'GO_GREEN' | 'ROUND_RESULT' | 'FINAL_SUMMARY';
+export type GameMode = 'guest' | 'bio' | null;
+export type GameState = 'START_SCREEN' | 'CALIBRATING' | 'ROUND_START' | 'WAITING_RED' | 'GO_GREEN' | 'PAUSE_PHASE' | 'FINAL_SUMMARY';
 
 export interface RoundData {
   round: number;
   reactionTime: number; // in ms
   focusScore: number;
+  isFoul: boolean;
 }
 
 interface GameStore {
+  gameMode: GameMode;
   gameState: GameState;
   currentRound: number;
   roundData: RoundData[];
+  
+  lastReactionTime: number | null;
+  foulCount: number;
   
   stressLevel: number;
   focusScore: number;
   baselineStress: number;
   calibrationSamples: number[];
   
+  startGame: (mode: GameMode) => void;
   setBiometrics: (stress: number, focus: number) => void;
-  startCalibration: () => void;
   finishCalibration: () => void;
   
   startRound: () => void;
   setWaitingRed: () => void;
   setGoGreen: () => void;
   
-  recordFoul: () => void;
-  recordReaction: (reactionTime: number) => void;
+  recordReaction: (reactionTime: number, isFoul: boolean) => void;
   
-  nextRound: () => void;
+  finishPause: () => void;
   resetGame: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
-  gameState: 'CALIBRATING',
+  gameMode: null,
+  gameState: 'START_SCREEN',
   currentRound: 1,
   roundData: [],
+  
+  lastReactionTime: null,
+  foulCount: 0,
   
   stressLevel: 0,
   focusScore: 0,
   baselineStress: 0,
   calibrationSamples: [],
+  
+  startGame: (mode) => {
+    set({
+      gameMode: mode,
+      gameState: mode === 'bio' ? 'CALIBRATING' : 'ROUND_START',
+      currentRound: 1,
+      roundData: [],
+      lastReactionTime: null,
+      foulCount: 0,
+      calibrationSamples: [],
+      stressLevel: 0,
+      focusScore: 0,
+      baselineStress: 0
+    });
+  },
   
   setBiometrics: (stress, focus) => {
     set((state) => {
@@ -51,10 +75,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
       return updates;
     });
-  },
-  
-  startCalibration: () => {
-    set({ gameState: 'CALIBRATING', calibrationSamples: [], currentRound: 1, roundData: [] });
   },
   
   finishCalibration: () => {
@@ -77,21 +97,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
   
-  recordFoul: () => {
+  recordReaction: (reactionTime, isFoul) => {
     set((state) => ({
-      gameState: 'ROUND_RESULT',
-      roundData: [...state.roundData, { round: state.currentRound, reactionTime: 1000, focusScore: state.focusScore }]
+      gameState: 'PAUSE_PHASE',
+      lastReactionTime: isFoul ? null : reactionTime,
+      foulCount: state.foulCount + (isFoul ? 1 : 0),
+      roundData: [
+        ...state.roundData, 
+        { 
+          round: state.currentRound, 
+          reactionTime: isFoul ? 1000 : reactionTime, 
+          focusScore: state.focusScore,
+          isFoul 
+        }
+      ]
     }));
   },
   
-  recordReaction: (reactionTime) => {
-    set((state) => ({
-      gameState: 'ROUND_RESULT',
-      roundData: [...state.roundData, { round: state.currentRound, reactionTime, focusScore: state.focusScore }]
-    }));
-  },
-  
-  nextRound: () => {
+  finishPause: () => {
     set((state) => {
       if (state.currentRound >= 10) {
         return { gameState: 'FINAL_SUMMARY' };
@@ -102,10 +125,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   resetGame: () => {
     set({
-      gameState: 'CALIBRATING',
+      gameMode: null,
+      gameState: 'START_SCREEN',
       currentRound: 1,
       roundData: [],
-      calibrationSamples: []
+      calibrationSamples: [],
+      lastReactionTime: null,
+      foulCount: 0
     });
   }
 }));
